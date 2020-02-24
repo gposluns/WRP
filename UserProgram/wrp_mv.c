@@ -9,6 +9,10 @@ int mv(const char *oldpath, const char *newpath) {
 	FILE *newptr;
 
 	oldptr = fopen(oldpath, "r");
+	if (oldptr == NULL) {
+		printf("%s does not exist\n", oldpath);
+		return 1;
+	} 
 
 	newptr = fopen(newpath, "r");
 	if (newptr != NULL) {
@@ -17,12 +21,6 @@ int mv(const char *oldpath, const char *newpath) {
 	}
 
 	newptr = fopen(newpath, "wb");
-
-	if (oldptr == NULL) {
-		printf("%s does not exist\n", oldpath);
-		return 1;
-	} 
-
 	if (newptr == NULL) {
 		printf("%s cannot be created\n", newpath);
 		return 1;
@@ -35,7 +33,6 @@ int mv(const char *oldpath, const char *newpath) {
 
 	fclose(oldptr);
 	fclose(newptr);
-
 	remove(oldpath);
 
 	return 0;
@@ -43,7 +40,6 @@ int mv(const char *oldpath, const char *newpath) {
 
 int main (int argc, char **argv)
 {
-	printf("wrp_mv\n");
 	if (argc != 3) {
 		printf("usage: wrp_mv /path/to/file/source /path/to/file/destination\n");
 		return 0;
