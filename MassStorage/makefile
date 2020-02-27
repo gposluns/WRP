@@ -133,6 +133,8 @@ include $(LUFA_PATH)/LUFA/makefile
 SRC = $(TARGET).c                                                 \
 	  Descriptors.c                                               \
 	  Lib/SCSI.c                                                  \
+	  Lib/SDCardManager.c 										  \
+	  Lib/sd_raw.c 												  \
 	  $(LUFA_SRC_USB)
 
 

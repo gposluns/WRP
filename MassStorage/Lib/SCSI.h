@@ -46,7 +46,7 @@
 
 		#include "MassStorage.h"
 		#include "Descriptors.h"
-		//#include "DataflashManager.h"
+		#include "SDCardManager.h"
 		#include "SCSI_Codes.h"
 
 		#define VIRTUAL_MEMORY_BLOCK_SIZE 1

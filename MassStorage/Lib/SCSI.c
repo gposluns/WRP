@@ -272,10 +272,10 @@ static void SCSI_Command_ReadWrite_10(const bool IsDataRead)
 	#endif
 	
 	/* Determine if the packet is a READ (10) or WRITE (10) command, call appropriate function */
-	// if (IsDataRead == DATA_READ)
-	//   DataflashManager_ReadBlocks(BlockAddress, TotalBlocks);
-	// else
-	//   DataflashManager_WriteBlocks(BlockAddress, TotalBlocks);
+	if (IsDataRead == DATA_READ)
+	  SDCardManager_ReadBlocks(BlockAddress, TotalBlocks);
+	else
+	  SDCardManager_WriteBlocks(BlockAddress, TotalBlocks);
 
 	/* Update the bytes transferred counter and succeed the command */
 	CommandBlock.DataTransferLength -= ((uint32_t)TotalBlocks * VIRTUAL_MEMORY_BLOCK_SIZE);

@@ -76,8 +76,9 @@ void SetupHardware(void)
 
 	/* Hardware Initialization */
 	LEDs_Init();
-	SPI_Init(SPI_SPEED_FCPU_DIV_2 | SPI_ORDER_MSB_FIRST | SPI_SCK_LEAD_FALLING | SPI_SAMPLE_TRAILING | SPI_MODE_MASTER);
-	//Dataflash_Init();
+	Serial_Init(9600, false);
+	//SPI_Init(SPI_SPEED_FCPU_DIV_2 | SPI_ORDER_MSB_FIRST | SPI_SCK_LEAD_FALLING | SPI_SAMPLE_TRAILING | SPI_MODE_MASTER);
+	SDCardManager_Init();
 	USB_Init();
 
 	/* Clear Dataflash sector protections, if enabled */

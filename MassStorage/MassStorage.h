@@ -45,13 +45,13 @@
 		#include "Descriptors.h"
 
 		#include "Lib/SCSI.h"
-		//#include "Lib/DataflashManager.h"
+		#include "Lib/SDCardManager.h"
 
 		#include <LUFA/Version.h>
 		#include <LUFA/Drivers/USB/USB.h>
 		#include <LUFA/Drivers/Board/LEDs.h>
 		#include <LUFA/Drivers/Peripheral/SPI.h>
-		//#include <LUFA/Drivers/Board/Dataflash.h>
+		#include <LUFA/Drivers/Peripheral/Serial.h>
 
 	/* Macros: */
 		/** Mass Storage Class specific request to reset the Mass Storage interface, ready for the next command. */
