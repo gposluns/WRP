@@ -1,4 +1,4 @@
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 
 #define SD_ERROR 0
 #define SD_READ 1
@@ -66,10 +66,10 @@
 #define configure_pin_available() //Do nothing
 #define configure_pin_locked() //Do nothing
 
-#define get_pin_available() ((PINC >> PC4) & 0x01)
-#define get_pin_locked() ((PINC >> PC5) & 0x01)
-//#define get_pin_available() (0) //Emulate that the card is present
-//#define get_pin_locked() (1) //Emulate that the card is always unlocked
+//#define get_pin_available() ((PINC >> PC4) & 0x01)
+//#define get_pin_locked() ((PINC >> PC5) & 0x01)
+#define get_pin_available() (0) //Emulate that the card is present
+#define get_pin_locked() (1) //Emulate that the card is always unlocked
 
 #if SD_RAW_SDHC
     typedef uint64_t offset_t;
@@ -825,8 +825,12 @@ uint8_t sd_raw_read_interval(offset_t offset, uint8_t* buffer, uintptr_t interva
 uint8_t sd_raw_write(offset_t offset, const uint8_t* buffer, uintptr_t length)
 {
     if(sd_raw_locked())
+    {
+      #ifdef SERIAL_DEBUG
+      Serial.println("locked");
+      #endif
         return 0;
-
+    }
     offset_t block_address;
     uint16_t block_offset;
     uint16_t write_length;
@@ -846,13 +850,23 @@ uint8_t sd_raw_write(offset_t offset, const uint8_t* buffer, uintptr_t length)
         {
 #if SD_RAW_WRITE_BUFFERING
             if(!sd_raw_sync())
+            {
+              #ifdef SERIAL_DEBUG
+              Serial.println("cant sync");
+              #endif
                 return 0;
+            }
 #endif
 
             if(block_offset || write_length < 512)
             {
                 if(!sd_raw_read(block_address, raw_block, sizeof(raw_block)))
+                {
+                  #ifdef SERIAL_DEBUG
+                  Serial.println("can't read original");
+                  #endif
                     return 0;
+                }
             }
             raw_block_address = block_address;
         }
@@ -880,6 +894,9 @@ uint8_t sd_raw_write(offset_t offset, const uint8_t* buffer, uintptr_t length)
 #endif
         {
             unselect_card();
+            #ifdef SERIAL_DEBUG
+            Serial.println("cmd failed");
+            #endif
             return 0;
         }
 
@@ -1198,12 +1215,12 @@ void handle_get_info()
     struct sd_raw_info disk_info;
     if(sd_raw_get_info(&disk_info))
     {
-      send_over_uart(SD_SUCCESS, 1);
+      Serial.write(SD_SUCCESS);
       send_over_uart((char*)&disk_info, sizeof(disk_info));
     }
     else
     {
-      send_over_uart(SD_ERROR, 1);
+      Serial.write(SD_ERROR);
     }
 }
 
@@ -1229,17 +1246,33 @@ void loop() {
           blks--; 
           break;
         case SD_WRITE: 
+          if (blks == 0) break;
+          receive_over_uart(buf, 1);
+          for (int i = 1; i < sizeof(buf); i++)
+          {
+            buf[i] = buf[0];
+          }
+          Serial.print("raw write returned: ");
+          Serial.println(sd_raw_write(addr*BLK_SIZE, buf, BLK_SIZE));
+          Serial.print("wrote to addr: ");
+          Serial.println(buf[0]);
+          Serial.println("contents of addr:");
+          sd_raw_read(addr*BLK_SIZE, buf, BLK_SIZE);
+          Serial.println(buf[0]);
+          addr++;
+          blks--;
           break;
         case SD_GET_INFO:
           handle_get_info();
           break;
         case SD_SET_ADDR:
-          addr = Serial.read();
+          receive_over_uart((uint8_t*)&addr, sizeof(uint32_t));
+          blks = 0;
           Serial.print("addr set to: ");
           Serial.println(addr);
           break;
         case SD_SET_BLKS:
-           blks = Serial.read();
+           receive_over_uart((uint8_t*)&blks, sizeof(uint16_t));
            Serial.print("blks set to: ");
            Serial.println(blks);
           break;
@@ -1275,6 +1308,7 @@ void loop() {
           break;
         case SD_SET_ADDR:
           receive_over_uart((uint8_t*)&addr, sizeof(uint32_t));
+          blks = 0;
           break;
         case SD_SET_BLKS:
            receive_over_uart((uint8_t*)&blks, sizeof(uint16_t));
