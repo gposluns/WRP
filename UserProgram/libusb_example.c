@@ -76,7 +76,7 @@ int main (int argc, char **argv) {
 		return 1;
 	}
 
- 	libusb_set_option(ctx, 3); // set verbosity level
+ 	//libusb_set_option(ctx, 3); // set verbosity level
  	cnt = libusb_get_device_list(ctx, &devs);
  	if (cnt < 0) {
  		printf(FMT_ERROR_LD, cnt);
@@ -100,12 +100,51 @@ int main (int argc, char **argv) {
 	if (r < 0) {
 		PRINT_ERR(r);
 		return 1;
+	} else {
+		printf("device opened!\n");
 	}
 
     if (!dh) {
         printf("error: cannot connect to device %d\n", libusb_get_device_address(dev));
     }
 
+    char data[4];
+
+    data[0]='a';data[1]='b';data[2]='c';data[3]='d';
+
+    int actual; //used to find out how many bytes were written
+    if(libusb_kernel_driver_active(dh, 0) == 1) { //find out if kernel driver is attached
+    	printf("kernel driver active\n");
+    	if(libusb_detach_kernel_driver(dh, 0) == 0) //detach it
+    		printf("kernel driver detached\n");
+    }
+
+    r = libusb_claim_interface(dh, 0); //claim interface 0 (the first) of device
+	if (r < 0) {
+		PRINT_ERR(r);
+		return 1;
+	} else {
+		printf("interface claimed!\n");
+	}
+
+	// TODO: find read/write endpoints
+	r = libusb_bulk_transfer(dh, (2 | LIBUSB_ENDPOINT_OUT), data, 4, &actual, 0);
+	if (r < 0) {
+		PRINT_ERR(r);
+		return 1;
+	} else {
+		printf("write successful!\n");
+	}	
+
+	r = libusb_release_interface(dh, 0); 
+	if (r < 0) {
+		PRINT_ERR(r);
+		return 1;
+	} else {
+		printf("released interface\n");
+	}	
+
+	libusb_close(dh);
  	libusb_free_device_list(devs, 1); // free device list
  	libusb_exit(ctx); // free ctx
  	return 0;
