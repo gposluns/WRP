@@ -215,7 +215,50 @@ static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpo
 		return -1;
 	}
 
-	printf("   sent %d CDB bytes\n", cdb_len);
+	printf("   sent %d command bytes\n", cdb_len);
+	return 0;
+}
+
+int write_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, char *data, uint32_t *tag) {
+	int r = send_mass_storage_command(dh, endpoint_out, command, COMMAND_DIRECTION_DATA_OUT, data_length, tag);
+	if (r < 0) {
+		printf("cannot write data\n");
+		return r;
+	} 
+
+	// int size;
+	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_out, data, data_length, &size, 5000));
+	// if (size != data_length) {
+	// 	printf("could not write all data\n");
+	// 	return -1;
+	// }
+
+	r = get_mass_storage_status(dh, endpoint_in, *tag);
+	if (r < 0) {
+		printf("cannot get write status\n");
+		return r;
+	}
+	return 0;
+}
+
+int read_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, char *data, uint32_t *tag) {
+	int r = send_mass_storage_command(dh, endpoint_out, command, COMMAND_DIRECTION_DATA_IN, data_length, tag);
+	if (r < 0) {
+		printf("cannot read data\n");
+		return r;
+	} 
+
+	// char buffer[256];
+	// int size, i;
+	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_in, (unsigned char*)&buffer, 256, &size, 1000));
+	// memcpy(data, buffer, size);
+	// printf("size=%d read=%s\n", size, data);
+
+	r = get_mass_storage_status(dh, endpoint_in, *tag);
+	if (r < 0) {
+		printf("cannot get read status\n");
+		return r;
+	}
 	return 0;
 }
 
@@ -264,29 +307,26 @@ int main (int argc, char **argv) {
         printf("error: cannot connect to device %d\n", libusb_get_device_address(dev));
     }
 
-    int data_length = 4;
-    int read_command_length = 9;
-    int write_command_length = 9;
+    int data_length = 0;
+    int command_length = 9;
 
-    char * writeData = (char *)malloc(sizeof(char *)*(data_length+write_command_length));
-    char * readData = (char *)malloc(sizeof(char *)*(read_command_length+data_length));
+    char * write_command = (char *)malloc(sizeof(char *)*command_length);
+    char * read_command = (char *)malloc(sizeof(char *)*command_length);
 
     int totalBlocks = 1;
     int blockAddress = 0;
 
     char * data = (char *)malloc(sizeof(char *)*data_length);
-    strcpy(data, "noot");
+    strcpy(data, "nootwashere");
 
-    writeData[0] = SCSI_CMD_WRITE_10;
-   	memcpy(writeData+2, &blockAddress, 4);
-   	memcpy(writeData+7, &totalBlocks, 2);
-   	//memcpy(writeData+9, data, data_length);
+    write_command[0] = SCSI_CMD_WRITE_10;
+   	memcpy(write_command+2, &blockAddress, 4);
+   	memcpy(write_command+7, &totalBlocks, 2);
 
-   	readData[0] = SCSI_CMD_READ_10;
-   	memcpy(readData+2, &blockAddress, 4);
-   	memcpy(readData+7, &totalBlocks, 2);
+   	read_command[0] = SCSI_CMD_READ_10;
+   	memcpy(read_command+2, &blockAddress, 4);
+   	memcpy(read_command+7, &totalBlocks, 2);
 
-    //int actual; //used to find out how many bytes were written
     if(libusb_kernel_driver_active(dh, 0) == 1) { //find out if kernel driver is attached
     	printf("kernel driver active\n");
     	if(libusb_detach_kernel_driver(dh, 0) == 0) //detach it
@@ -303,46 +343,20 @@ int main (int argc, char **argv) {
 
 	int endpoint_out = 4;
 	int endpoint_in = 131;
-	uint32_t expected_tag;
+	uint32_t tag;
 
-	r = send_mass_storage_command(dh, endpoint_out, writeData, COMMAND_DIRECTION_DATA_OUT, data_length, &expected_tag);
+	r = write_and_get_status(dh, endpoint_out, endpoint_in, write_command, data_length, data, &tag);
 	if (r < 0) {
-		printf("cannot write data\n");
 		return 1;
 	} else {
-		printf("write successful!\n");
+		printf("write command sent successfully!\n");
 	}
 
-	r = get_mass_storage_status(dh, endpoint_in, expected_tag);
+	r = read_and_get_status(dh, endpoint_out, endpoint_in, read_command, data_length, data, &tag);
 	if (r < 0) {
 		return 1;
 	} else {
-		printf("got status!\n");
-	}
-
-	r = send_mass_storage_command(dh, endpoint_out, readData, COMMAND_DIRECTION_DATA_IN, data_length, &expected_tag);
-	if (r < 0) {
-		PRINT_ERR("cannot read data", r);
-		return 1;
-	} else {
-		printf("read successful!\n");
-	}
-
-	// char buffer[256];
-	// int size, i;
-	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_in, (unsigned char*)&buffer, 256, &size, 1000));
-	// for (i = 0; i < size; i++) {
-	// 	data[i] = buffer[i];
-	// 	if (data[i] == 0)
-	// 		break;
-	// }
-	// printf("size=%d read=%s\n", size, data);
-
-	r = get_mass_storage_status(dh, endpoint_in, expected_tag);
-	if (r < 0) {
-		return 1;
-	} else {
-		printf("got status!\n");
+		printf("read command sent successfully!\n");
 	}
 
 	r = libusb_release_interface(dh, 0); 
@@ -353,8 +367,8 @@ int main (int argc, char **argv) {
 		printf("released interface\n");
 	}	
 
-	free(readData);
-	free(writeData);
+	free(read_command);
+	free(write_command);
 	free(data);
 	libusb_close(dh);
  	libusb_free_device_list(devs, 1); // free device list
