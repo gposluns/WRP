@@ -16,6 +16,12 @@
 #define REQUEST_SENSE_LENGTH          0x12
 #define INQUIRY_LENGTH                0x24
 
+#define SCSI_CMD_INQUIRY                               0x12
+#define SCSI_CMD_REQUEST_SENSE                         0x03
+#define SCSI_CMD_TEST_UNIT_READY                       0x00
+#define SCSI_CMD_READ_CAPACITY_10                      0x25
+#define SCSI_CMD_SEND_DIAGNOSTIC                       0x1D
+#define SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL          0x1E
 #define SCSI_CMD_WRITE_10                              0x2A
 #define SCSI_CMD_READ_10                               0x28
 
@@ -25,44 +31,26 @@
 /** Mask for a Command Block Wrapper's flags attribute to specify a command with data sent from device-to-host. */
 #define COMMAND_DIRECTION_DATA_IN  (1 << 7)
 
+#define ERR_EXIT(errcode) do { perr("   %s\n", libusb_strerror((enum libusb_error)errcode)); return -1; } while (0)
+#define CALL_CHECK(fcall) do { r=fcall; if (r < 0) ERR_EXIT(r); } while (0);
 
 // Section 5.1: Command Block Wrapper (CBW)
 struct command_block_wrapper {
-	uint8_t dCBWSignature[4];
-	uint32_t dCBWTag;
-	uint32_t dCBWDataTransferLength;
-	uint8_t bmCBWFlags;
-	uint8_t bCBWLUN;
-	uint8_t bCBWCBLength;
-	uint8_t CBWCB[16];
+	uint8_t Signature[4];
+	uint32_t Tag;
+	uint32_t DataTransferLength;
+	uint8_t Flags;
+	uint8_t LUN;
+	uint8_t SCSICommandLength;
+	uint8_t SCSICommandData[16];
 };
 
 // Section 5.2: Command Status Wrapper (CSW)
 struct command_status_wrapper {
-	uint8_t dCSWSignature[4];
-	uint32_t dCSWTag;
-	uint32_t dCSWDataResidue;
-	uint8_t bCSWStatus;
-};
-
-static uint8_t cdb_length[256] = {
-//	 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  0
-	06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,06,  //  1
-	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  2
-	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  3
-	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  4
-	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,  //  5
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  6
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  7
-	16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,  //  8
-	16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,  //  9
-	12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,  //  A
-	12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,  //  B
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  C
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  D
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,  //  E
-	00,00,00,00,00,00,00,00,00,00,00,00,00,00,02,00,  //  F
+	uint8_t Signature[4];
+	uint32_t Tag;
+	uint32_t DataResidue;
+	uint8_t Status;
 };
 
 static int perr(char const *format, ...)
@@ -154,35 +142,26 @@ static int get_mass_storage_status(libusb_device_handle *handle, uint8_t endpoin
 		perr("   get_mass_storage_status: received %d bytes (expected 13)\n", size);
 		return -1;
 	}
-	if (csw.dCSWTag != expected_tag) {
+	if (csw.Tag != expected_tag) {
 		perr("   get_mass_storage_status: mismatched tags (expected %08X, received %08X)\n",
-			expected_tag, csw.dCSWTag);
+			expected_tag, csw.Tag);
 		return -1;
 	}
 	// For this test, we ignore the dCSWSignature check for validity...
-	printf("   Mass Storage Status: %02X (%s)\n", csw.bCSWStatus, csw.bCSWStatus?"FAILED":"Success");
-	if (csw.dCSWTag != expected_tag)
+	printf("   Mass Storage Status: %02X (%s)\n", csw.Status, csw.Status?"FAILED":"Success");
+	if (csw.Tag != expected_tag)
 		return -1;
-	if (csw.bCSWStatus) {
+	if (csw.Status) {
 		// REQUEST SENSE is appropriate only if bCSWStatus is 1, meaning that the
 		// command failed somehow.  Larger values (2 in particular) mean that
 		// the command couldn't be understood.
-		if (csw.bCSWStatus == 1) {
-			printf("CSW DataResidue:%d\n", csw.dCSWDataResidue);
+		if (csw.Status == 1) {
+			printf("CSW DataResidue:%d\n", csw.DataResidue);
 			return -2;	// request Get Sense
 		}
 		else
 			return -1;
 	}
-
-	// do {
-	// 	uint8_t b;
-	// 	r = libusb_bulk_transfer(handle, endpoint, &b, 1, &size, 1000);
-	// 	// if (r == LIBUSB_ERROR_PIPE) {
-	// 	// 	libusb_clear_halt(handle, endpoint);
-	// 	// }
-	// 	// i++;
-	// } while ((r == LIBUSB_ERROR_PIPE));
 
 	// In theory we also should check dCSWDataResidue.  But lots of devices
 	// set it wrongly.
@@ -206,34 +185,26 @@ static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpo
 		return -1;
 	}
 
-	cdb_len = cdb_length[cdb[0]];
-	if ((cdb_len == 0) || (cdb_len > sizeof(cbw.CBWCB))) {
-		perr("send_mass_storage_command: don't know how to handle this command (%02X, length %d)\n",
-			cdb[0], cdb_len);
-		return -1;
-	}
-	// if (cdb[0] == 0xFE) /* vendor */
-	// 	if (cdb[1] == 2) /* special command length*/
-	// 		cdb_len = 6;
+	if (direction == COMMAND_DIRECTION_DATA_OUT) cdb_len = 9;
+	if (direction == COMMAND_DIRECTION_DATA_IN) cdb_len = 9;
 
 	memset(&cbw, 0, sizeof(cbw));
-	cbw.dCBWSignature[0] = 'U';
-	cbw.dCBWSignature[1] = 'S';
-	cbw.dCBWSignature[2] = 'B';
-	cbw.dCBWSignature[3] = 'C';
+	cbw.Signature[0] = 'U';
+	cbw.Signature[1] = 'S';
+	cbw.Signature[2] = 'B';
+	cbw.Signature[3] = 'C';
 	*ret_tag = tag;
-	cbw.dCBWTag = tag++;
-	cbw.dCBWDataTransferLength = data_length;
-	cbw.bmCBWFlags = direction;
-	cbw.bCBWLUN = 0;
-	// Subclass is 1 or 6 => cdb_len
-	cbw.bCBWCBLength = cdb_len;
-	memcpy(cbw.CBWCB, cdb, cdb_len);
+	cbw.Tag = tag++;
+	cbw.DataTransferLength = data_length;
+	cbw.Flags = direction;
+	cbw.LUN = 0;
+	cbw.SCSICommandLength = cdb_len;
+	memcpy(cbw.SCSICommandData, cdb, cdb_len);
 
 	i = 0;
 	do {
 		// The transfer length must always be exactly 31 bytes.
-		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, 31, &size, 1000);
+		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, cdb_len+data_length, &size, 1000);
 		if (r == LIBUSB_ERROR_PIPE) {
 			libusb_clear_halt(handle, endpoint);
 		}
@@ -293,18 +264,23 @@ int main (int argc, char **argv) {
         printf("error: cannot connect to device %d\n", libusb_get_device_address(dev));
     }
 
-    char * writeData = (char *)malloc(sizeof(char *)*(512+10));
-    char * readData = (char *)malloc(sizeof(char *)*(512+10));
+    int data_length = 4;
+    int read_command_length = 9;
+    int write_command_length = 9;
 
-    writeData[0]=SCSI_CMD_WRITE_10;
+    char * writeData = (char *)malloc(sizeof(char *)*(data_length+write_command_length));
+    char * readData = (char *)malloc(sizeof(char *)*(read_command_length+data_length));
+
     int totalBlocks = 1;
-    int blockAddress = 0x00000000;
-    char * data = (char *)malloc(sizeof(char *)*512);
+    int blockAddress = 0;
+
+    char * data = (char *)malloc(sizeof(char *)*data_length);
     strcpy(data, "noot");
 
+    writeData[0] = SCSI_CMD_WRITE_10;
    	memcpy(writeData+2, &blockAddress, 4);
    	memcpy(writeData+7, &totalBlocks, 2);
-   	memcpy(writeData+9, data, 512);
+   	//memcpy(writeData+9, data, data_length);
 
    	readData[0] = SCSI_CMD_READ_10;
    	memcpy(readData+2, &blockAddress, 4);
@@ -325,12 +301,11 @@ int main (int argc, char **argv) {
 		printf("interface claimed!\n");
 	}
 
-	// endpoints: 4 = write and 131 = read ?
 	int endpoint_out = 4;
 	int endpoint_in = 131;
 	uint32_t expected_tag;
 
-	r = send_mass_storage_command(dh, endpoint_out, writeData, COMMAND_DIRECTION_DATA_OUT, 522, &expected_tag);
+	r = send_mass_storage_command(dh, endpoint_out, writeData, COMMAND_DIRECTION_DATA_OUT, data_length, &expected_tag);
 	if (r < 0) {
 		printf("cannot write data\n");
 		return 1;
@@ -345,14 +320,23 @@ int main (int argc, char **argv) {
 		printf("got status!\n");
 	}
 
-	r = send_mass_storage_command(dh, endpoint_out, readData, COMMAND_DIRECTION_DATA_IN, 522, &expected_tag);
+	r = send_mass_storage_command(dh, endpoint_out, readData, COMMAND_DIRECTION_DATA_IN, data_length, &expected_tag);
 	if (r < 0) {
 		PRINT_ERR("cannot read data", r);
 		return 1;
 	} else {
 		printf("read successful!\n");
-	 	printf("readData: %s\n", readData);
 	}
+
+	// char buffer[256];
+	// int size, i;
+	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_in, (unsigned char*)&buffer, 256, &size, 1000));
+	// for (i = 0; i < size; i++) {
+	// 	data[i] = buffer[i];
+	// 	if (data[i] == 0)
+	// 		break;
+	// }
+	// printf("size=%d read=%s\n", size, data);
 
 	r = get_mass_storage_status(dh, endpoint_in, expected_tag);
 	if (r < 0) {
