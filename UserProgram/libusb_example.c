@@ -204,7 +204,7 @@ static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpo
 	i = 0;
 	do {
 		// The transfer length must always be exactly 31 bytes.
-		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, cdb_len+data_length, &size, 1000);
+		r = libusb_bulk_transfer(handle, endpoint, (unsigned char*)&cbw, cdb_len, &size, 1000);
 		if (r == LIBUSB_ERROR_PIPE) {
 			libusb_clear_halt(handle, endpoint);
 		}
@@ -219,19 +219,19 @@ static int send_mass_storage_command(libusb_device_handle *handle, uint8_t endpo
 	return 0;
 }
 
-int write_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, char *data, uint32_t *tag) {
+int write_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, uint8_t *data, uint32_t *tag) {
 	int r = send_mass_storage_command(dh, endpoint_out, command, COMMAND_DIRECTION_DATA_OUT, data_length, tag);
 	if (r < 0) {
 		printf("cannot write data\n");
 		return r;
 	} 
 
-	// int size;
-	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_out, data, data_length, &size, 5000));
-	// if (size != data_length) {
-	// 	printf("could not write all data\n");
-	// 	return -1;
-	// }
+	int size;
+	CALL_CHECK(libusb_bulk_transfer(dh, endpoint_out, (unsigned char *)&data, data_length, &size, 5000));
+	if (size != data_length) {
+		printf("could not write all data\n");
+		return -1;
+	}
 
 	r = get_mass_storage_status(dh, endpoint_in, *tag);
 	if (r < 0) {
@@ -241,18 +241,18 @@ int write_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t
 	return 0;
 }
 
-int read_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, char *data, uint32_t *tag) {
+int read_and_get_status(libusb_device_handle *dh, uint8_t endpoint_out, uint8_t endpoint_in, uint8_t *command, int data_length, uint8_t *data, uint32_t *tag) {
 	int r = send_mass_storage_command(dh, endpoint_out, command, COMMAND_DIRECTION_DATA_IN, data_length, tag);
 	if (r < 0) {
 		printf("cannot read data\n");
 		return r;
 	} 
 
-	// char buffer[256];
-	// int size, i;
-	// CALL_CHECK(libusb_bulk_transfer(dh, endpoint_in, (unsigned char*)&buffer, 256, &size, 1000));
-	// memcpy(data, buffer, size);
-	// printf("size=%d read=%s\n", size, data);
+	char buffer[512];
+	int size, i;
+	CALL_CHECK(libusb_bulk_transfer(dh, endpoint_in, (unsigned char*)&buffer, data_length, &size, 1000));
+	memcpy(data, buffer, size);
+	printf("size=%d data=%s\n", size, data);
 
 	r = get_mass_storage_status(dh, endpoint_in, *tag);
 	if (r < 0) {
@@ -307,7 +307,7 @@ int main (int argc, char **argv) {
         printf("error: cannot connect to device %d\n", libusb_get_device_address(dev));
     }
 
-    int data_length = 0;
+    int data_length = 1;
     int command_length = 9;
 
     char * write_command = (char *)malloc(sizeof(char *)*command_length);
@@ -316,7 +316,7 @@ int main (int argc, char **argv) {
     int totalBlocks = 1;
     int blockAddress = 0;
 
-    char * data = (char *)malloc(sizeof(char *)*data_length);
+    unsigned char * data = (unsigned char *)malloc(sizeof(unsigned char *)*data_length);
     strcpy(data, "nootwashere");
 
     write_command[0] = SCSI_CMD_WRITE_10;
