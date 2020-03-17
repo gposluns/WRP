@@ -61,6 +61,7 @@
 		#define REQ_GetMaxLUN              0xFE
 
 		#define TOTAL_LUNS 				   1
+		#define LUN_MEDIA_BLOCKS           (SDCardManager_GetNbBlocks() / TOTAL_LUNS) 
 
 		/** Maximum length of a SCSI command which can be issued by the device or host in a Mass Storage bulk wrapper. */
 		#define MAX_SCSI_COMMAND_LENGTH    16 

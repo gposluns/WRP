@@ -49,8 +49,6 @@
 		#include "SDCardManager.h"
 		#include "SCSI_Codes.h"
 
-		#define VIRTUAL_MEMORY_BLOCK_SIZE 1
-		#define LUN_MEDIA_BLOCKS 1
 	
 	/* Macros: */
 		/** Macro to set the current SCSI sense data to the given key, additional sense code and additional sense qualifier. This

@@ -44,6 +44,19 @@ static struct sd_raw_info disk_info;
 static uint32_t CachedTotalBlocks = 0;
 static uint8_t Buffer[16];
 
+RingBuff_t rxbuff;
+
+/** ISR to manage the reception of data from the serial port, placing received bytes into a circular buffer
+ *  for later transmission to the host.
+ */
+ISR(USART1_RX_vect, ISR_BLOCK)
+{
+	uint8_t ReceivedByte = UDR1;
+
+	if (USB_DeviceState == DEVICE_STATE_Configured)
+	  RingBuffer_Insert(&rxbuff, ReceivedByte);
+}
+
 void SD_send_bytes(uint8_t* bytes, int n)
 {
 	for(; n > 0; n--)
@@ -54,12 +67,12 @@ void SD_send_bytes(uint8_t* bytes, int n)
 
 void SD_receive_bytes(uint8_t* bytes, int n)
 {
-	for (; n > 0; n--)
+	while (RingBuffer_GetCount(&rxbuff) < n);
+	for(; n > 0; n--)
 	{
-		*bytes++ = Serial_RxByte();
+		*bytes++ = RingBuffer_Remove(&rxbuff);
 	}
 }
-
 
 void SDCardManager_Init(void) //since SD card is talking to 328 chip this isn't doing any initialization
 {
@@ -153,13 +166,24 @@ void SDCardManager_WriteBlocks(uint32_t BlockAddress, uint16_t TotalBlocks)
 	Serial_TxByte(SD_SET_BLKS);
 	SD_send_bytes((uint8_t*)&TotalBlocks, sizeof(uint16_t));
 
+	uint8_t response;
 	while (TotalBlocks)
 	{
 		//sd_raw_write_interval(BlockAddress *  VIRTUAL_MEMORY_BLOCK_SIZE, Buffer, VIRTUAL_MEMORY_BLOCK_SIZE, &SDCardManager_WriteBlockHandler, NULL);
-		Serial_TxByte(SD_WRITE);
-		for (int i = 0; i < VIRTUAL_MEMORY_BLOCK_SIZE; i++)
+		for (int i = 0; i < VIRTUAL_MEMORY_BLOCK_SIZE; i+=16)
 		{
-			Serial_TxByte(Endpoint_Read_Byte());
+			Serial_TxByte(SD_WRITE);
+			for (int j = 0; j < 16; j++)
+			{
+				Serial_TxByte(Endpoint_Read_Byte());
+			}
+			SD_receive_bytes(&response, 1);
+			if (response != SD_SUCCESS)
+			{
+				LEDs_SetAllLEDs(LEDMASK_USB_ERROR);
+				Serial_TxByte(SD_ABORT);
+				break;
+			}
 		}
 
 
@@ -243,17 +267,28 @@ void SDCardManager_ReadBlocks(uint32_t BlockAddress, uint16_t TotalBlocks)
 	Serial_TxByte(SD_SET_BLKS);
 	SD_send_bytes((uint8_t*)&TotalBlocks, sizeof(uint16_t));
 
-	
+	uint8_t response;
+	uint8_t readBuff[16];
 	while (TotalBlocks)
 	{
 		/* Read a data block from the SD card */
 		//sd_raw_read_interval(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, Buffer, 16, 512, &SDCardManager_ReadBlockHandler, NULL);
-		Serial_TxByte(SD_READ);
-		for(int i = 0; i < 16; i++)
+		for (int i = 0; i < VIRTUAL_MEMORY_BLOCK_SIZE; i+=16)
 		{
-			Endpoint_Write_Byte(Serial_RxByte());
+			Serial_TxByte(SD_READ);
+			SD_receive_bytes(&response, 1);
+			if (response != SD_SUCCESS)
+			{
+				LEDs_SetAllLEDs(LEDMASK_USB_ERROR);
+				Serial_TxByte(SD_ABORT);
+				break;
+			}
+			SD_receive_bytes(readBuff, 16);
+			for(int j = 0; j < 16; j++)
+			{
+				Endpoint_Write_Byte(readBuff[j]);
+			}
 		}
-
 
 		/* Decrement the blocks remaining counter */
 		BlockAddress++;

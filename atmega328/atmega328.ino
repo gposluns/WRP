@@ -10,6 +10,7 @@
 #define SD_ABORT 7
 
 #define BLK_SIZE 512
+#define TRANSMIT_LENGTH 16
   
  //FROM SD_RAW_CONFIG_H//////////////////////////////////////////
   /**
@@ -1168,10 +1169,18 @@ uint8_t sd_raw_get_info(struct sd_raw_info* info)
     return 1;
 }
 /////////////////////////////////////////////////////////////////////////
+
+uint32_t addr;
+uint32_t offset;
+uint16_t blks;
+uint8_t buf[BLK_SIZE];
+
 void setup() {
   // put your setup code here, to run once:
-  #ifdef SERIAL_DEBUG
+  offset = 0;
+  blks = 0;
   Serial.begin(9600);
+  #ifdef SERIAL_DEBUG
   while(!Serial.available()){}
   Serial.println("About to try initializing SD card");
   #endif
@@ -1223,10 +1232,6 @@ void handle_get_info()
       Serial.write(SD_ERROR);
     }
 }
-
-uint32_t addr;
-uint16_t blks;
-uint8_t buf[BLK_SIZE];
 
 void loop() {
 
@@ -1291,17 +1296,28 @@ void loop() {
       {
         case SD_READ: 
           if (blks == 0) break;
-          sd_raw_read(addr*BLK_SIZE, buf, BLK_SIZE);
-          send_over_uart(buf, sizeof(buf));
-          addr++;
-          blks--; 
+          if (offset == 0)
+          {
+            sd_raw_read(addr*BLK_SIZE, buf, BLK_SIZE);
+            addr++;
+            blks--; 
+          }
+          Serial.write(SD_SUCCESS);
+          send_over_uart(buf + offset, TRANSMIT_LENGTH);
+          offset = (offset + TRANSMIT_LENGTH) % BLK_SIZE;
           break;
         case SD_WRITE:
           if (blks == 0) break;
-          receive_over_uart(buf, sizeof(buf));
-          sd_raw_write(addr*BLK_SIZE, buf, BLK_SIZE);
-          addr++;
-          blks--; 
+          receive_over_uart(buf + offset, TRANSMIT_LENGTH);
+          offset += TRANSMIT_LENGTH;
+          if (offset == BLK_SIZE)
+          {
+            sd_raw_write(addr*BLK_SIZE, buf, BLK_SIZE);
+            addr++;
+            blks--;
+            offset = 0;
+          } 
+          Serial.write(SD_SUCCESS);
           break;
         case SD_GET_INFO:
           handle_get_info();
@@ -1315,6 +1331,7 @@ void loop() {
           break;
         case SD_ABORT:
           blks = 0;
+          offset = 0;
           break;
       }
     }
