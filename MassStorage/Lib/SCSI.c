@@ -1,21 +1,21 @@
 /*
              LUFA Library
-     Copyright (C) Dean Camera, 2010.
+     Copyright (C) Dean Camera, 2009.
               
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
 
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2009  Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
-  Permission to use, copy, modify, distribute, and sell this 
-  software and its documentation for any purpose is hereby granted
-  without fee, provided that the above copyright notice appear in 
-  all copies and that both that the copyright notice and this
-  permission notice and warranty disclaimer appear in supporting 
-  documentation, and that the name of the author not be used in 
-  advertising or publicity pertaining to distribution of the 
+  Permission to use, copy, modify, and distribute this software
+  and its documentation for any purpose and without fee is hereby
+  granted, provided that the above copyright notice appear in all
+  copies and that both that the copyright notice and this
+  permission notice and warranty disclaimer appear in supporting
+  documentation, and that the name of the author not be used in
+  advertising or publicity pertaining to distribution of the
   software without specific, written prior permission.
 
   The author disclaim all warranties with regard to this
@@ -88,6 +88,8 @@ SCSI_Request_Sense_Response_t SenseData =
  */
 bool SCSI_DecodeSCSICommand(void)
 {
+	//printf("SCSI_DecodeSCSICommand %i\r\n", CommandBlock.SCSICommandData[0]);
+	
 	/* Set initial sense data, before the requested command is processed */
 	SCSI_SET_SENSE(SCSI_SENSE_KEY_GOOD,
 	               SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
@@ -97,21 +99,27 @@ bool SCSI_DecodeSCSICommand(void)
 	switch (CommandBlock.SCSICommandData[0])
 	{
 		case SCSI_CMD_INQUIRY:
+			//printf("INQUIRY\r\n");
 			SCSI_Command_Inquiry();			
 			break;
 		case SCSI_CMD_REQUEST_SENSE:
+			//printf("REQUEST_SENSE\r\n");
 			SCSI_Command_Request_Sense();
 			break;
 		case SCSI_CMD_READ_CAPACITY_10:
+			//printf("READ_CAPACITY_10\r\n");
 			SCSI_Command_Read_Capacity_10();			
 			break;
 		case SCSI_CMD_SEND_DIAGNOSTIC:
+			//printf("SEND_DIAGNOSTIC\r\n");
 			SCSI_Command_Send_Diagnostic();
 			break;
 		case SCSI_CMD_WRITE_10:
+			//printf("WRITE_10\r\n");
 			SCSI_Command_ReadWrite_10(DATA_WRITE);
 			break;
 		case SCSI_CMD_READ_10:
+			//printf("READ_10\r\n");
 			SCSI_Command_ReadWrite_10(DATA_READ);
 			break;
 		case SCSI_CMD_TEST_UNIT_READY:
@@ -119,6 +127,12 @@ bool SCSI_DecodeSCSICommand(void)
 		case SCSI_CMD_VERIFY_10:
 			/* These commands should just succeed, no handling required */
 			CommandBlock.DataTransferLength = 0;
+			break;
+		case SCSI_WRP_REQ_CHALLENGE:
+			send_challenge();
+			break;
+		case SCSI_WRP_RESPONSE:
+			verify_challenge_response();
 			break;
 		default:
 			/* Update the SENSE key to reflect the invalid command */
@@ -136,7 +150,8 @@ bool SCSI_DecodeSCSICommand(void)
  */
 static void SCSI_Command_Inquiry(void)
 {
-	uint16_t AllocationLength  = SwapEndian_16(*(uint16_t*)&CommandBlock.SCSICommandData[3]);
+	uint16_t AllocationLength  = (((uint16_t)CommandBlock.SCSICommandData[3] << 8) |
+	                                         CommandBlock.SCSICommandData[4]);
 	uint16_t BytesTransferred  = (AllocationLength < sizeof(InquiryData))? AllocationLength :
 	                                                                       sizeof(InquiryData);
 
@@ -158,7 +173,7 @@ static void SCSI_Command_Inquiry(void)
 	uint8_t PadBytes[AllocationLength - BytesTransferred];
 	
 	/* Pad out remaining bytes with 0x00 */
-	Endpoint_Write_Stream_LE(&PadBytes, sizeof(PadBytes), StreamCallback_AbortOnMassStoreReset);
+	Endpoint_Write_Stream_LE(&PadBytes, (AllocationLength - BytesTransferred), StreamCallback_AbortOnMassStoreReset);
 
 	/* Finalize the stream transfer to send the last packet */
 	Endpoint_ClearIN();
@@ -181,7 +196,7 @@ static void SCSI_Command_Request_Sense(void)
 	uint8_t PadBytes[AllocationLength - BytesTransferred];
 	
 	/* Pad out remaining bytes with 0x00 */
-	Endpoint_Write_Stream_LE(&PadBytes, sizeof(PadBytes), StreamCallback_AbortOnMassStoreReset);
+	Endpoint_Write_Stream_LE(&PadBytes, (AllocationLength - BytesTransferred), StreamCallback_AbortOnMassStoreReset);
 
 	/* Finalize the stream transfer to send the last packet */
 	Endpoint_ClearIN();
@@ -195,8 +210,13 @@ static void SCSI_Command_Request_Sense(void)
  */
 static void SCSI_Command_Read_Capacity_10(void)
 {
+	uint32_t NbBlocks;
+	
+	/* Get the number of blocks in the SD device */
+	NbBlocks = SDCardManager_GetNbBlocks();
+	
 	/* Send the total number of logical blocks in the current LUN */
-	Endpoint_Write_DWord_BE(LUN_MEDIA_BLOCKS - 1);
+	Endpoint_Write_DWord_BE(NbBlocks - 1);
 
 	/* Send the logical block size of the device (must be 512 bytes) */
 	Endpoint_Write_DWord_BE(VIRTUAL_MEMORY_BLOCK_SIZE);
@@ -230,7 +250,7 @@ static void SCSI_Command_Send_Diagnostic(void)
 	}
 	
 	/* Check to see if all attached Dataflash ICs are functional */
-	if (/*!(DataflashManager_CheckDataflashOperation())*/1)
+	if (!(SDCardManager_CheckDataflashOperation()))
 	{
 		/* Update SENSE key with a hardware error condition and return command fail */
 		SCSI_SET_SENSE(SCSI_SENSE_KEY_HARDWARE_ERROR,
@@ -245,16 +265,26 @@ static void SCSI_Command_Send_Diagnostic(void)
 }
 
 /** Command processing for an issued SCSI READ (10) or WRITE (10) command. This command reads in the block start address
- *  and total number of blocks to process, then calls the appropriate low-level Dataflash routine to handle the actual
+ *  and total number of blocks to process, then calls the appropriate low-level dataflash routine to handle the actual
  *  reading and writing of the data.
  *
  *  \param[in] IsDataRead  Indicates if the command is a READ (10) command or WRITE (10) command (DATA_READ or DATA_WRITE)
  */
 static void SCSI_Command_ReadWrite_10(const bool IsDataRead)
 {
-	uint32_t BlockAddress = SwapEndian_32(*(uint32_t*)&CommandBlock.SCSICommandData[2]);
-	uint16_t TotalBlocks  = SwapEndian_16(*(uint16_t*)&CommandBlock.SCSICommandData[7]);
+	uint32_t BlockAddress;
+	uint16_t TotalBlocks;
+	
+	/* Load in the 32-bit block address (SCSI uses big-endian, so have to do it byte-by-byte) */
+	((uint8_t*)&BlockAddress)[3] = CommandBlock.SCSICommandData[2];
+	((uint8_t*)&BlockAddress)[2] = CommandBlock.SCSICommandData[3];
+	((uint8_t*)&BlockAddress)[1] = CommandBlock.SCSICommandData[4];
+	((uint8_t*)&BlockAddress)[0] = CommandBlock.SCSICommandData[5];
 
+	/* Load in the 16-bit total blocks (SCSI uses big-endian, so have to do it byte-by-byte) */
+	((uint8_t*)&TotalBlocks)[1]  = CommandBlock.SCSICommandData[7];
+	((uint8_t*)&TotalBlocks)[0]  = CommandBlock.SCSICommandData[8];
+	
 	/* Check if the block address is outside the maximum allowable value for the LUN */
 	if (BlockAddress >= LUN_MEDIA_BLOCKS)
 	{

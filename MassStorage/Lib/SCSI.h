@@ -1,21 +1,21 @@
 /*
              LUFA Library
-     Copyright (C) Dean Camera, 2010.
+     Copyright (C) Dean Camera, 2009.
               
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
 
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2009  Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
-  Permission to use, copy, modify, distribute, and sell this 
-  software and its documentation for any purpose is hereby granted
-  without fee, provided that the above copyright notice appear in 
-  all copies and that both that the copyright notice and this
-  permission notice and warranty disclaimer appear in supporting 
-  documentation, and that the name of the author not be used in 
-  advertising or publicity pertaining to distribution of the 
+  Permission to use, copy, modify, and distribute this software
+  and its documentation for any purpose and without fee is hereby
+  granted, provided that the above copyright notice appear in all
+  copies and that both that the copyright notice and this
+  permission notice and warranty disclaimer appear in supporting
+  documentation, and that the name of the author not be used in
+  advertising or publicity pertaining to distribution of the
   software without specific, written prior permission.
 
   The author disclaim all warranties with regard to this
@@ -48,7 +48,6 @@
 		#include "Descriptors.h"
 		#include "SDCardManager.h"
 		#include "SCSI_Codes.h"
-
 	
 	/* Macros: */
 		/** Macro to set the current SCSI sense data to the given key, additional sense code and additional sense qualifier. This
@@ -63,10 +62,10 @@
 		                                                   SenseData.AdditionalSenseCode = (acode); \
 		                                                   SenseData.AdditionalSenseQualifier = (aqual); }MACROE
 
-		/** Macro for the \ref SCSI_Command_ReadWrite_10() function, to indicate that data is to be read from the storage medium. */
+		/** Macro for the SCSI_Command_ReadWrite_10() function, to indicate that data is to be read from the storage medium. */
 		#define DATA_READ           true
 
-		/** Macro for the \ref SCSI_Command_ReadWrite_10() function, to indicate that data is to be written to the storage medium. */
+		/** Macro for the SCSI_Command_ReadWrite_10() function, to indicate that data is to be written to the storage medium. */
 		#define DATA_WRITE          false
 
 		/** Value for the DeviceType entry in the SCSI_Inquiry_Response_t enum, indicating a Block Media device. */
@@ -84,32 +83,32 @@
 			unsigned char DeviceType          : 5;
 			unsigned char PeripheralQualifier : 3;
 			
-			unsigned char Reserved            : 7;
+			unsigned char _RESERVED1          : 7;
 			unsigned char Removable           : 1;
 			
-			uint8_t       Version;
+			uint8_t      Version;
 			
 			unsigned char ResponseDataFormat  : 4;
-			unsigned char Reserved2           : 1;
+			unsigned char _RESERVED2          : 1;
 			unsigned char NormACA             : 1;
 			unsigned char TrmTsk              : 1;
 			unsigned char AERC                : 1;
 
-			uint8_t       AdditionalLength;
-			uint8_t       Reserved3[2];
+			uint8_t      AdditionalLength;
+			uint8_t      _RESERVED3[2];
 
 			unsigned char SoftReset           : 1;
 			unsigned char CmdQue              : 1;
-			unsigned char Reserved4           : 1;
+			unsigned char _RESERVED4          : 1;
 			unsigned char Linked              : 1;
 			unsigned char Sync                : 1;
 			unsigned char WideBus16Bit        : 1;
 			unsigned char WideBus32Bit        : 1;
 			unsigned char RelAddr             : 1;
 			
-			uint8_t       VendorID[8];
-			uint8_t       ProductID[16];
-			uint8_t       RevisionID[4];
+			uint8_t      VendorID[8];
+			uint8_t      ProductID[16];
+			uint8_t      RevisionID[4];
 		} SCSI_Inquiry_Response_t;
 		
 		/** Type define for a SCSI sense structure to a SCSI REQUEST SENSE command. For details of the
@@ -122,18 +121,18 @@
 			uint8_t       SegmentNumber;
 			
 			unsigned char SenseKey            : 4;
-			unsigned char Reserved            : 1;
+			unsigned char _RESERVED1          : 1;
 			unsigned char ILI                 : 1;
 			unsigned char EOM                 : 1;
 			unsigned char FileMark            : 1;
 			
-			uint8_t       Information[4];
-			uint8_t       AdditionalLength;
-			uint8_t       CmdSpecificInformation[4];
-			uint8_t       AdditionalSenseCode;
-			uint8_t       AdditionalSenseQualifier;
-			uint8_t       FieldReplaceableUnitCode;
-			uint8_t       SenseKeySpecific[3];
+			uint8_t      Information[4];
+			uint8_t      AdditionalLength;
+			uint8_t      CmdSpecificInformation[4];
+			uint8_t      AdditionalSenseCode;
+			uint8_t      AdditionalSenseQualifier;
+			uint8_t      FieldReplaceableUnitCode;
+			uint8_t      SenseKeySpecific[3];
 		} SCSI_Request_Sense_Response_t;
 		
 	/* Function Prototypes: */

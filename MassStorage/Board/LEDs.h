@@ -1,24 +1,24 @@
 /*
              LUFA Library
-     Copyright (C) Dean Camera, 2010.
-              
+     Copyright (C) Dean Camera, 2017.
+
   dean [at] fourwalledcubicle [dot] com
-      www.fourwalledcubicle.com
+           www.lufa-lib.org
 */
 
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2017  Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
-  Permission to use, copy, modify, distribute, and sell this 
+  Permission to use, copy, modify, distribute, and sell this
   software and its documentation for any purpose is hereby granted
-  without fee, provided that the above copyright notice appear in 
+  without fee, provided that the above copyright notice appear in
   all copies and that both that the copyright notice and this
-  permission notice and warranty disclaimer appear in supporting 
-  documentation, and that the name of the author not be used in 
-  advertising or publicity pertaining to distribution of the 
+  permission notice and warranty disclaimer appear in supporting
+  documentation, and that the name of the author not be used in
+  advertising or publicity pertaining to distribution of the
   software without specific, written prior permission.
 
-  The author disclaim all warranties with regard to this
+  The author disclaims all warranties with regard to this
   software, including all implied warranties of merchantability
   and fitness.  In no event shall the author be liable for any
   special, indirect or consequential damages or any damages
@@ -28,77 +28,133 @@
   this software.
 */
 
-/*
-   Board LEDs driver for the Benito board, from www.dorkbotpdx.org.
-*/
+/** \file
+ *  \brief Board specific LED driver header for the Arduino Leonardo board.
+ *  \copydetails Group_LEDs_LEONARDO
+ *
+ *  \note This file should not be included directly. It is automatically included as needed by the LEDs driver
+ *        dispatch header located in LUFA/Drivers/Board/LEDs.h.
+ */
 
-#ifndef __LEDS_ARDUINOUNO_H__
-#define __LEDS_ARDUINOUNO_H__
+/** \ingroup Group_LEDs
+ *  \defgroup Group_LEDs_LEONARDO LEONARDO
+ *  \brief Board specific LED driver header for the Arduino Leonardo board.
+ *
+ *  Board specific LED driver header for the Arduino Leonardo board (http://arduino.cc/en/Main/arduinoBoardLeonardo).
+ *
+ *  <table>
+ *    <tr><th>Name</th><th>Color</th><th>Info</th><th>Active Level</th><th>Port Pin</th></tr>
+ *    <tr><td>LEDS_LED1</td><td>Yellow</td><td>RX</td><td>Low</td><td>PORTB.0</td></tr>
+ *    <tr><td>LEDS_LED2</td><td>Yellow</td><td>TX</td><td>Low</td><td>PORTD.5</td></tr>
+ *    <tr><td>LEDS_LED3</td><td>Yellow</td><td>General Indicator</td><td>High</td><td>PORTC.7</td></tr>
+ *  </table>
+ *
+ *  @{
+ */
+
+#ifndef __LEDS_LEONARDO_H__
+#define __LEDS_LEONARDO_H__
 
 	/* Includes: */
-		#include <avr/io.h>
+		//#include "../../../../Common/Common.h"
 
-/* Enable C linkage for C++ Compilers: */
+	/* Enable C linkage for C++ Compilers: */
 		#if defined(__cplusplus)
 			extern "C" {
 		#endif
 
 	/* Preprocessor Checks: */
-		#if !defined(INCLUDE_FROM_LEDS_H)
+		#if !defined(__INCLUDE_FROM_LEDS_H)
 			#error Do not include this file directly. Include LUFA/Drivers/Board/LEDS.h instead.
 		#endif
+
+	/* Private Interface - For use in library only: */
+	#if !defined(__DOXYGEN__)
+		/* Macros: */
+			#define LEDS_PORTB_LEDS       (LEDS_LED1)
+			#define LEDS_PORTD_LEDS       (LEDS_LED2)
+			#define LEDS_PORTC_LEDS       (LEDS_LED3)
+	#endif
 
 	/* Public Interface - May be used in end-application: */
 		/* Macros: */
 			/** LED mask for the first LED on the board. */
-			#define LEDS_LED1        (1 << 5)
+			#define LEDS_LED1        (1 << 0)
 
 			/** LED mask for the second LED on the board. */
-			#define LEDS_LED2        (1 << 4)
+			#define LEDS_LED2        (1 << 5)
+
+			/** LED mask for the third LED on the board. */
+			#define LEDS_LED3        (1 << 7)
 
 			/** LED mask for all the LEDs on the board. */
-			#define LEDS_ALL_LEDS    (LEDS_LED1 | LEDS_LED2)
+			#define LEDS_ALL_LEDS    (LEDS_LED1 | LEDS_LED2 | LEDS_LED3)
 
-			/** LED mask for the none of the board LEDs */
+			/** LED mask for none of the board LEDs. */
 			#define LEDS_NO_LEDS     0
 
 		/* Inline Functions: */
 		#if !defined(__DOXYGEN__)
 			static inline void LEDs_Init(void)
 			{
-				DDRD  |= LEDS_ALL_LEDS;
-				PORTD |= LEDS_ALL_LEDS;
+				DDRB  |=  LEDS_PORTB_LEDS;
+				PORTB |=  LEDS_PORTB_LEDS;
+				DDRD  |=  LEDS_PORTD_LEDS;
+				PORTD |=  LEDS_PORTD_LEDS;
+				DDRC  |=  LEDS_PORTC_LEDS;
+				PORTC &= ~LEDS_PORTC_LEDS;
 			}
-			
+
+			static inline void LEDs_Disable(void)
+			{
+				DDRB  &= ~LEDS_PORTB_LEDS;
+				PORTB &= ~LEDS_PORTB_LEDS;
+				DDRD  &= ~LEDS_PORTD_LEDS;
+				PORTD &= ~LEDS_PORTD_LEDS;
+				DDRC  &= ~LEDS_PORTC_LEDS;
+				PORTC &= ~LEDS_PORTC_LEDS;
+			}
+
 			static inline void LEDs_TurnOnLEDs(const uint8_t LEDMask)
 			{
-				PORTD &= ~LEDMask;
+				PORTB &= ~(LEDMask & LEDS_PORTB_LEDS);
+				PORTD &= ~(LEDMask & LEDS_PORTD_LEDS);
+				PORTC |=  (LEDMask & LEDS_PORTC_LEDS);
 			}
 
 			static inline void LEDs_TurnOffLEDs(const uint8_t LEDMask)
 			{
-				PORTD |= LEDMask;
+				PORTB |=  (LEDMask & LEDS_PORTB_LEDS);
+				PORTD |=  (LEDMask & LEDS_PORTD_LEDS);
+				PORTC &= ~(LEDMask & LEDS_PORTC_LEDS);
 			}
 
 			static inline void LEDs_SetAllLEDs(const uint8_t LEDMask)
 			{
-				PORTD = ((PORTD | LEDS_ALL_LEDS) & ~LEDMask);
+				PORTB = ((PORTB |  LEDS_PORTB_LEDS) & ~(LEDMask & LEDS_PORTB_LEDS));
+				PORTD = ((PORTD |  LEDS_PORTD_LEDS) & ~(LEDMask & LEDS_PORTD_LEDS));
+				PORTC = ((PORTC & ~LEDS_PORTC_LEDS) |  (LEDMask & LEDS_PORTC_LEDS));
 			}
-			
-			static inline void LEDs_ChangeLEDs(const uint8_t LEDMask, const uint8_t ActiveMask)
+
+			static inline void LEDs_ChangeLEDs(const uint8_t LEDMask,
+			                                   const uint8_t ActiveMask)
 			{
-				PORTD = ((PORTD | ActiveMask) & ~LEDMask);
+				PORTB = ((PORTB |  (LEDMask & LEDS_PORTB_LEDS)) & ~(ActiveMask & LEDS_PORTB_LEDS));
+				PORTD = ((PORTD |  (LEDMask & LEDS_PORTD_LEDS)) & ~(ActiveMask & LEDS_PORTD_LEDS));
+				PORTC = ((PORTC & ~(LEDMask & LEDS_PORTC_LEDS)) |  (ActiveMask & LEDS_PORTC_LEDS));
 			}
 
 			static inline void LEDs_ToggleLEDs(const uint8_t LEDMask)
 			{
-				PORTD ^= LEDMask;
+				PINB  = (LEDMask & LEDS_PORTB_LEDS);
+				PIND  = (LEDMask & LEDS_PORTD_LEDS);
+				PINC  = (LEDMask & LEDS_PORTC_LEDS);
 			}
-			
+
 			static inline uint8_t LEDs_GetLEDs(void) ATTR_WARN_UNUSED_RESULT;
 			static inline uint8_t LEDs_GetLEDs(void)
 			{
-				return (PORTD & LEDS_ALL_LEDS);
+				return ((~PORTB & LEDS_PORTB_LEDS) | (~PORTD & LEDS_PORTD_LEDS) | (PORTC & LEDS_PORTC_LEDS));
 			}
 		#endif
 
@@ -106,5 +162,8 @@
 		#if defined(__cplusplus)
 			}
 		#endif
-		
+
 #endif
+
+/** @} */
+

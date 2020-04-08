@@ -327,3 +327,62 @@ uint8_t StreamCallback_AbortOnMassStoreReset(void)
 	/* Continue with the current stream operation */
 	return STREAMCALLBACK_Continue;
 }
+
+void e(uint8_t* in, uint8_t* out, int n)
+{
+	//TODO: use a real encryption library
+	//currently just using the plaintext
+	memcpy(out, in, n);
+}
+
+bool verify_challenge_request()
+{
+	//TODO: This
+	return true;
+}
+
+void send_challenge()
+{
+	//TODO: Real challenge
+	if (!verify_challenge_request) 
+	{
+		return;
+	}
+	uint8_t plaintext[96];
+	uint8_t ciphertext[96];
+	memcpy(plaintext, &CommandBlock.SCSICommandData[CommandBlock.SCSICommandLength - 32], 32);
+	memset(plaintext + 32, 0xab, 32); //this should be a real challenge
+	memset(plaintext + 64, 0xba, 32); //this should be a dynamic correct response
+	e(plaintext, ciphertext, 96);
+
+	Endpoint_Write_Byte(SCSI_WRP_REQ_CHALLENGE);
+	for (int i = 0; i < 64; i++)
+	{
+		Endpoint_Write_Byte(plaintext[i]); //needs to be made into a real challenge
+	}
+	for (int i = 0; i < 96; i++)
+	{
+		Endpoint_Write_Byte(ciphertext[i]);
+	}
+}
+
+void verify_challenge_response()
+{
+	uint8_t response[96];
+	uint8_t token[32];
+	e(CommandBlock.SCSICommandData, response, 96);
+	if (memcmp(response, CommandBlock.SCSICommandData + 96, 96))
+	{
+		return;
+	}
+	e(CommandBlock.SCSICommandData, token, 32);
+	Endpoint_Write_Byte(SCSI_WRP_RESPONSE);
+	for (int i = 0; i < 32; i++)
+	{
+		Endpoint_Write_Byte(CommandBlock.SCSICommandData[i]);
+	}
+	for (int i = 0; i < 32; i++)
+	{
+		Endpoint_Write_Byte(token[i]);
+	}
+}

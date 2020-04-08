@@ -106,11 +106,11 @@ extern "C"
 #elif defined(__AVR_ATmega32U4__)
     #define configure_pin_mosi() DDRB |= (1 << DDB2)
     #define configure_pin_sck() DDRB |= (1 << DDB1)
-    #define configure_pin_ss() DDRB |= (1 << DDB0)
+    #define configure_pin_ss() DDRB |= (1 << DDB6)
     #define configure_pin_miso() DDRB &= ~(1 << DDB3)
 
-    #define select_card() PORTB &= ~(1 << PORTB0)
-    #define unselect_card() PORTB |= (1 << PORTB0)
+    #define select_card() PORTB &= ~(1 << PORTB6)
+    #define unselect_card() PORTB |= (1 << PORTB6)
 #elif defined(__AVR_ATmega16U2__)
     #define configure_pin_mosi() DDRB |= (1 << DDB2)
     #define configure_pin_sck() DDRB |= (1 << DDB1)
@@ -130,10 +130,10 @@ extern "C"
 #define configure_pin_available() //Do nothing
 #define configure_pin_locked() //Do nothing
 
-#define get_pin_available() ((PINC >> PC4) & 0x01)
-#define get_pin_locked() ((PINC >> PC5) & 0x01)
-//#define get_pin_available() (0) //Emulate that the card is present
-//#define get_pin_locked() (1) //Emulate that the card is always unlocked
+//#define get_pin_available() ((PINC >> PC4) & 0x01)
+//#define get_pin_locked() ((PINC >> PC5) & 0x01)
+#define get_pin_available() (0) //Emulate that the card is present
+#define get_pin_locked() (1) //Emulate that the card is always unlocked
 
 #if SD_RAW_SDHC
     typedef uint64_t offset_t;

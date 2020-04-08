@@ -12,6 +12,8 @@
 #include <avr/io.h>
 #include "sd_raw.h"
 
+#include <LUFA/Drivers/Board/LEDs.h>
+
 /**
  * \addtogroup sd_raw MMC/SD/SDHC card raw access
  *
@@ -171,6 +173,7 @@ static uint8_t sd_raw_send_command(uint8_t command, uint32_t arg);
  */
 uint8_t sd_raw_init()
 {
+    //LEDs_SetAllLEDs(LEDS_LED1);
     /* enable inputs for reading card status */
     configure_pin_available();
     configure_pin_locked();
@@ -196,9 +199,10 @@ uint8_t sd_raw_init()
 
     /* initialization procedure */
     sd_raw_card_type = 0;
-    
     if(!sd_raw_available())
+    {
         return 0;
+    }
 
     /* card needs 74 cycles minimum to start up */
     for(uint8_t i = 0; i < 10; ++i)
@@ -218,9 +222,42 @@ uint8_t sd_raw_init()
         if(response == (1 << R1_IDLE_STATE))
             break;
 
+        // if(response == (1 << R1_ILL_COMMAND))
+        // {
+        //     LEDs_SetAllLEDs(LEDS_LED1);
+        // }
+        // else if (response == (1 << R1_PARAM_ERR))
+        // {
+        //     LEDs_SetAllLEDs(LEDS_LED2);
+        // }
+        // else if (response == (1 << R1_ADDR_ERR))
+        // {
+        //     LEDs_SetAllLEDs(LEDS_LED3);
+        // }
+        // else if (response == (1 << R1_ERASE_RESET))
+        // {
+        //     LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
+        // }
+        // else if (response == (1 << R1_COM_CRC_ERR))
+        // {
+        //     LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED3);
+        // }
+        // else
+        // {
+        //     if (response == 0xff)
+        //     {
+        //         LEDs_SetAllLEDs(LEDS_NO_LEDS);
+        //     }
+        //     else
+        //     {
+        //         LEDs_SetAllLEDs(LEDS_ALL_LEDS);
+        //     }
+        // }
+
         if(i == 0x1ff)
         {
             unselect_card();
+            
             return 0;
         }
     }
@@ -233,9 +270,15 @@ uint8_t sd_raw_init()
         sd_raw_rec_byte();
         sd_raw_rec_byte();
         if((sd_raw_rec_byte() & 0x01) == 0)
+        {
+            LEDs_SetAllLEDs(LEDS_LED1);
             return 0; /* card operation voltage range doesn't match */
+        }
         if(sd_raw_rec_byte() != 0xaa)
+        {
+            LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED3);
             return 0; /* wrong test pattern */
+        }
 
         /* card conforms to SD 2 card specification */
         sd_raw_card_type |= (1 << SD_RAW_SPEC_2);
@@ -256,7 +299,7 @@ uint8_t sd_raw_init()
             /* MMC card */
         }
     }
-
+    //LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
     /* wait for card to get ready */
     for(uint16_t i = 0; ; ++i)
     {

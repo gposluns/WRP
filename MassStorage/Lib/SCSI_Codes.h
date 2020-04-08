@@ -1,21 +1,21 @@
 /*
              LUFA Library
-     Copyright (C) Dean Camera, 2010.
+     Copyright (C) Dean Camera, 2009.
               
   dean [at] fourwalledcubicle [dot] com
       www.fourwalledcubicle.com
 */
 
 /*
-  Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  Copyright 2009  Dean Camera (dean [at] fourwalledcubicle [dot] com)
 
-  Permission to use, copy, modify, distribute, and sell this 
-  software and its documentation for any purpose is hereby granted
-  without fee, provided that the above copyright notice appear in 
-  all copies and that both that the copyright notice and this
-  permission notice and warranty disclaimer appear in supporting 
-  documentation, and that the name of the author not be used in 
-  advertising or publicity pertaining to distribution of the 
+  Permission to use, copy, modify, and distribute this software
+  and its documentation for any purpose and without fee is hereby
+  granted, provided that the above copyright notice appear in all
+  copies and that both that the copyright notice and this
+  permission notice and warranty disclaimer appear in supporting
+  documentation, and that the name of the author not be used in
+  advertising or publicity pertaining to distribution of the
   software without specific, written prior permission.
 
   The author disclaim all warranties with regard to this
@@ -81,5 +81,8 @@
 		#define SCSI_ASENSEQ_FORMAT_COMMAND_FAILED             0x01
 		#define SCSI_ASENSEQ_INITIALIZING_COMMAND_REQUIRED     0x02
 		#define SCSI_ASENSEQ_OPERATION_IN_PROGRESS             0x07
+
+        #define SCSI_WRP_REQ_CHALLENGE                         0xAA
+        #define SCSI_WRP_RESPONSE                              0xCC
 
 #endif
