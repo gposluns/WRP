@@ -328,6 +328,11 @@ uint8_t StreamCallback_AbortOnMassStoreReset(void)
 	return STREAMCALLBACK_Continue;
 }
 
+/*
+ * Encrypt <in> into <out>. Both <in> and <out> are n bytes in length.
+ * The user should not be able to replicate this function.
+ * All bytes of the output should depend on all bytes of the input.
+ */
 void e(uint8_t* in, uint8_t* out, int n)
 {
 	//TODO: use a real encryption library
@@ -335,24 +340,51 @@ void e(uint8_t* in, uint8_t* out, int n)
 	memcpy(out, in, n);
 }
 
+/*
+ * Verify that CommandBlock contains a valid challenge request
+ */
 bool verify_challenge_request()
 {
 	//TODO: This
 	return true;
 }
 
+/* 
+ * Generate a challenge and response
+ * Input: 
+ * - message_id (32 bytes): can be used as a random seed for the generation
+ * Output:
+ * - challenge (32 bytes): this wil be sent to the user
+ * - response (32 bytes): the user must solve the challenge by re-creating this value
+ */
+void generate_challenge_and_response(uint8_t* message_id, uint8_t* challenge, uint8_t* response)
+{
+	memset(challenge, 0xab, 32); //this should be a real challenge
+	memset(response, 0xba, 32); //this should be a dynamic correct response
+}
+
+/**
+ * Generate a challenge and send it back to the driver
+ * Input is the last 32 bytes of the SCSICommandData, which must be
+ * the message ID (a hash of the bulk data payload the user wants
+ * to submit)
+ * Output is in the following form:
+ * - Message ID (32 bytes)
+ * - Challenge (32 bytes)
+ * - Verification code (96 bytes)
+ */
 void send_challenge()
 {
 	//TODO: Real challenge
-	if (!verify_challenge_request) 
+	if (!verify_challenge_request()) 
 	{
 		return;
 	}
 	uint8_t plaintext[96];
 	uint8_t ciphertext[96];
+
 	memcpy(plaintext, &CommandBlock.SCSICommandData[CommandBlock.SCSICommandLength - 32], 32);
-	memset(plaintext + 32, 0xab, 32); //this should be a real challenge
-	memset(plaintext + 64, 0xba, 32); //this should be a dynamic correct response
+	generate_challenge_and_response(plaintext, plaintext + 32, plaintext + 64);
 	e(plaintext, ciphertext, 96);
 
 	Endpoint_Write_Byte(SCSI_WRP_REQ_CHALLENGE);
@@ -366,6 +398,17 @@ void send_challenge()
 	}
 }
 
+/**
+ * Verify a challenge response, and send a token if successful
+ * Input is in the following form:
+ * - Message ID (32 bytes)
+ * - Challenge (32 bytes)
+ * - Response (32 bytes)
+ * - Verification code (96 bytes)
+ * Sucessful output is in the following form:
+ * - Message ID (32 bytes)
+ * - Token (32 bytes)
+ */
 void verify_challenge_response()
 {
 	uint8_t response[96];
