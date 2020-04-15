@@ -83,6 +83,16 @@
 		#define SCSI_ASENSEQ_OPERATION_IN_PROGRESS             0x07
 
         #define SCSI_WRP_REQ_CHALLENGE                         0xAA
+/*
+ * - Message ID (32 bytes)
+ * - Challenge (32 bytes)
+ * - Verification code (96 bytes)
+ */
+
         #define SCSI_WRP_RESPONSE                              0xCC
+/*
+ * - Message ID (32 bytes)
+ * - Token (32 bytes)
+ */
 
 #endif
